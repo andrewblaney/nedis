@@ -1,0 +1,70 @@
+{
+  "name": "@bbc/nedis",
+  "version": "1.0.0",
+  "description": "Node Redis DB",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "npm run clean && tsc",
+    "watch": "tsc --watch",
+    "clean": "rm -fr dist/*",
+    "prepublish": "npm run build",
+    "pretest": "npm run build",
+    "test": "mocha",
+    "posttest": "npm run lint",
+    "lint": "tslint --project tsconfig.json --format stylish",
+    "coverage": "nyc mocha && nyc report --reporter=html && nyc report --reporter=json-summary",
+    "badge": "ibl-repo-badges ibl-bundles-api coverage/coverage-summary.json"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/andrewblaney/nedis.git"
+  },
+  "author": "ibl-team@lists.forge.bbc.co.uk",
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/andrewblaney/nedis/issues"
+  },
+  "devDependencies": {
+    "@bbc/ibl-repo-badges": "^1.0.1",
+    "@types/chai": "^4.1.4",
+    "@types/mocha": "^2.2.43",
+    "@types/node": "^10.12.18",
+    "@types/sinon": "^4.0.0",
+    "@types/typescript": "^2.0.0",
+    "babel-eslint": "^8.2.2",
+    "chai": "^4.2.0",
+    "eslint": "^4.19.1",
+    "eslint-config-iplayer-base": "^1.0.0",
+    "istanbul": "^1.1.0-alpha.1",
+    "mocha": "^2.1.0",
+    "nyc": "^11.2.1",
+    "sinon": "^2.3.6",
+    "ts-node": "^3.3.0",
+    "tslint": "^5.8.0",
+    "tslint-config-airbnb": "^5.3.1",
+    "tslint-microsoft-contrib": "^5.0.3",
+    "typescript": "^2.6.1"
+  },
+  "nyc": {
+    "include": [
+      "src/**/*.ts"
+    ],
+    "extension": [
+      ".ts"
+    ],
+    "require": [
+      "ts-node/register"
+    ],
+    "sourceMap": true,
+    "instrument": true
+  },
+  "nodeVersion": ">= 8.0.0",
+  "prune": false,
+  "dependencies": {
+    "@types/joi": "^14.3.3",
+    "@types/redis": "^2.8.12",
+    "joi": "^14.3.1",
+    "redis": "^2.8.0"
+  }
+}
