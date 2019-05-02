@@ -5,17 +5,17 @@
 ## Installation
 
 ```
-npm install --save @bbc/nedis
+npm i
 ```
 
 ## Test
 
 ```
-npm test
+npm t
 ```
 
-To generate a test coverage report:
-
+## Run example:
 ```
-npm run coverage
+# after npm i
+./node_modules/.bin/ts-node example.ts
 ```
