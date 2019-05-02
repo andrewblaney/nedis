@@ -1,6 +1,6 @@
 import * as Redis from 'ioredis';
 import * as Joi from 'joi';
-import nedis, { NedisClient } from './nedis';
+import nedis, { NedisClient } from './src/nedis';
 
 const DogSchema = Joi.object().keys({
     id: Joi.string().required(),
