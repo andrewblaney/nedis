@@ -62,9 +62,11 @@
   "nodeVersion": ">= 8.0.0",
   "prune": false,
   "dependencies": {
+    "@types/bluebird": "^3.5.26",
+    "@types/ioredis": "^4.0.10",
     "@types/joi": "^14.3.3",
-    "@types/redis": "^2.8.12",
-    "joi": "^14.3.1",
-    "redis": "^2.8.0"
+    "async-redis": "^1.1.7",
+    "ioredis": "^4.9.0",
+    "joi": "^14.3.1"
   }
 }

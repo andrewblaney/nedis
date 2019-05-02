@@ -1,40 +1,12 @@
-
+import * as Redis from 'ioredis';
 import * as Joi from 'joi';
-import * as redis from 'redis';
-
-export interface SchemaDefinition {
-  name: string;
-  pk: string;
-  schema: Joi.JoiObject;
-}
-
-interface NedisConfig {
-  host?: string;
-  port?: number;
-}
-
-class UnregisteredSchemaError extends Error {
-  constructor(tableName: string) {
-    super(`Schema ${tableName} is not registered.`);
-  }
-}
-
-class ValidationError extends Error {
-  constructor(JoiMessage: string) {
-    super(JoiMessage);
-  }
-}
-
-class DuplicateSchemaError extends Error {
-  constructor(tableName: string) {
-    super(`${tableName} schema is already registered.`);
-  }
-}
+import { ConnectionError, DatabaseInsertError, DuplicateSchemaError, ItemAlreadyExistsError, ItemNotFoundError, UnregisteredSchemaError, ValidationError } from './errors';
+import { NedisConfig, SchemaDefinition } from './types';
 
 export class NedisClient {
-  registeredSchemas: SchemaDefinition[];
   config: NedisConfig;
-  private redis: redis.RedisClient;
+  private registeredSchemas: SchemaDefinition[];
+  private redis: Redis.Redis;
 
   constructor(config: NedisConfig = {}) {
     this.registeredSchemas = [];
@@ -56,15 +28,11 @@ export class NedisClient {
     return this.registeredSchemas;
   }
 
-  public isConnected(): boolean {
-    return this.redis.connected;
-  }
-
-  public getRedisClient(): redis.RedisClient {
+  public getRedisClient(): Redis.Redis {
     return this.redis;
   }
 
-  public getSchema(table: string): SchemaDefinition {
+  public validateSchema(table: string): SchemaDefinition {
     const matchingSchema = this.registeredSchemas.find(s => s.name === table);
     if (!matchingSchema) {
       throw new UnregisteredSchemaError(table);
@@ -81,21 +49,104 @@ export class NedisClient {
     }
   }
 
-  public insert(table: string, data: object) {
-    const schemaDef = this.getSchema(table);
+  public async insert(table: string, data): Promise<boolean> {
+    const schemaDef = this.validateSchema(table);
     this.validateData(data, schemaDef.schema);
+    const key = this.getKey(table, data[schemaDef.pk]);
+    const client = this.getRedisClient();
+    const keyExists = await client.exists(key);
+
+    if (keyExists) {
+      throw new ItemAlreadyExistsError(key);
+    }
+
+    try {
+      await this.addToIndex(table, key);
+      await client.hmset(key, data);
+      return true;
+    } catch (err) {
+      if (err instanceof DatabaseInsertError) { throw err; }
+      throw new DatabaseInsertError(key, err.message);
+    }
+  }
+
+  public async get(table: string, pk: string): Promise<object> {
+    const schemaDef = this.validateSchema(table);
+    const result = await this.redis.hgetall(`${table}:${pk}`);
+    if (!result[schemaDef.pk]) {
+      throw new ItemNotFoundError(pk, table);
+    }
+    return result;
+  }
+  public async getAll(table: string): Promise<object[]> {
+    this.validateSchema(table);
+    const members = await this.lmembers(table);
+    return Promise.all(members.map(key => this.redis.hgetall(key)));
+  }
+
+  public async update(table: string, pk: string, data): Promise<object> {
+    const item = await this.get(table, pk);
+    const updatedObject = Object.assign(item, data);
+    await this.redis.hmset(this.getKey(table, pk), updatedObject);
+    return updatedObject;
+  }
+
+  public async delete(table: string, pk: string): Promise<boolean> {
+    await this.get(table, pk);
+    const key = this.getKey(table, pk);
+    await this.redis.lrem(table, 1, key);
+    await this.redis.del(key);
+    return true;
+
+  }
+
+  public async lmembers(table: string): Promise<any> {
+    return this.redis.lrange(table, 0, -1);
+  }
+
+  public async connect(): Promise<boolean> {
+    try {
+      await this.redis.connect();
+    } catch (err) {
+      throw new ConnectionError(`Could not connect to redis at ${this.config.host}:${this.config.port}`);
+    }
+    return true;
+  }
+
+  private async addToIndex(table: string, key: string): Promise<boolean> {
+    const members = await this.lmembers(table);
+    if (members.includes(key)) {
+      throw new DatabaseInsertError(key, 'Key doesnt exist but key is in table set.');
+    }
+    await this.redis.rpush(table, key);
+    return true;
+  }
+
+  private getKey(table: string, pk: string): string {
+    return [table, pk].join(':');
   }
 
   private setConfig(config: NedisConfig): void {
     this.config = Object.assign({
       host: 'localhost',
-      port: 6379
+      port: 6379,
+      lazyConnect: true
     }, config);
 
-    this.redis = redis.createClient(this.config);
+    this.redis = new Redis(this.config)
+      .on('error', error => {
+        // console.error(error);
+        // todo send this to logger in config
+      });
   }
 }
 
-export function createClient(config?: NedisConfig): NedisClient {
-  return new NedisClient(config);
+export async function createClient(config?: NedisConfig): Promise<NedisClient> {
+  const client = new NedisClient(config);
+  await client.connect();
+  return client;
 }
+
+export default {
+  createClient
+};
