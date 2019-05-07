@@ -1,5 +1,6 @@
 import * as Redis from 'ioredis';
 import * as Joi from 'joi';
+import { ItemNotFoundError } from './src/errors';
 import nedis, { NedisClient } from './src/nedis';
 
 const DogSchema = Joi.object().keys({
@@ -55,6 +56,19 @@ class API {
             this.log(`Ralphs deleted: ${deleteRalph}\n`);
             dogs = await client.getAll('dogs');
             this.log('All dogs:', dogs);
+
+            // execption example
+            try {
+                this.log('Trying to delete Ralph again..');
+                await client.delete('dogs', '1');
+            } catch (err) {
+                if (err instanceof ItemNotFoundError) {
+                    this.log('Item doesnt exist');
+                } else {
+                    throw err;
+                }
+            }
+
             this.cleanUp();
         } catch (err) {
             console.error(err);

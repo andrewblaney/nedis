@@ -62,8 +62,8 @@ describe('nedis', () => {
   describe('schemas', () => {
     let client: NedisClient;
 
-    beforeEach(async () => {
-      client = await nedis.createClient();
+    beforeEach(() => {
+      client = nedis.createClient();
     });
 
     it('individual schemas can be registered', () => {
@@ -161,7 +161,8 @@ describe('nedis', () => {
 
     it('handles no connection', async () => {
       try {
-        await nedis.createClient({ port: 1234 });
+        const client = nedis.createClient({ port: 1234 });
+        await client.insert('users', { id: '1', name: 'andrew', age: '13' });
         assert.fail('ConnectionError exception not thrown');
       } catch (e) {
         if (e instanceof AssertionError) {

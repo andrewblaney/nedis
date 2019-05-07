@@ -7,8 +7,10 @@ export class NedisClient {
   config: NedisConfig;
   private registeredSchemas: SchemaDefinition[];
   private redis: Redis.Redis;
+  private connected: boolean;
 
   constructor(config: NedisConfig = {}) {
+    this.connected = false;
     this.registeredSchemas = [];
     this.setConfig(config);
   }
@@ -50,6 +52,7 @@ export class NedisClient {
   }
 
   public async insert(table: string, data): Promise<boolean> {
+    await this.checkConnection();
     const schemaDef = this.validateSchema(table);
     this.validateData(data, schemaDef.schema);
     const key = this.getKey(table, data[schemaDef.pk]);
@@ -71,6 +74,7 @@ export class NedisClient {
   }
 
   public async get(table: string, pk: string): Promise<object> {
+    await this.checkConnection();
     const schemaDef = this.validateSchema(table);
     const result = await this.redis.hgetall(`${table}:${pk}`);
     if (!result[schemaDef.pk]) {
@@ -79,12 +83,14 @@ export class NedisClient {
     return result;
   }
   public async getAll(table: string): Promise<object[]> {
+    await this.checkConnection();
     this.validateSchema(table);
     const members = await this.lmembers(table);
     return Promise.all(members.map(key => this.redis.hgetall(key)));
   }
 
   public async update(table: string, pk: string, data): Promise<object> {
+    await this.checkConnection();
     const item = await this.get(table, pk);
     const updatedObject = Object.assign(item, data);
     await this.redis.hmset(this.getKey(table, pk), updatedObject);
@@ -92,6 +98,7 @@ export class NedisClient {
   }
 
   public async delete(table: string, pk: string): Promise<boolean> {
+    await this.checkConnection();
     await this.get(table, pk);
     const key = this.getKey(table, pk);
     await this.redis.lrem(table, 1, key);
@@ -104,16 +111,25 @@ export class NedisClient {
     return this.redis.lrange(table, 0, -1);
   }
 
-  public async connect(): Promise<boolean> {
+  private async checkConnection(): Promise<NedisClient> {
+    if (!this.connected) {
+      await this.connect();
+    }
+    return this;
+  }
+
+  private async connect(): Promise<NedisClient> {
     try {
       await this.redis.connect();
+      this.connected = true;
     } catch (err) {
       throw new ConnectionError(`Could not connect to redis at ${this.config.host}:${this.config.port}`);
     }
-    return true;
+    return this;
   }
 
   private async addToIndex(table: string, key: string): Promise<boolean> {
+    await this.checkConnection();
     const members = await this.lmembers(table);
     if (members.includes(key)) {
       throw new DatabaseInsertError(key, 'Key doesnt exist but key is in table set.');
@@ -141,10 +157,8 @@ export class NedisClient {
   }
 }
 
-export async function createClient(config?: NedisConfig): Promise<NedisClient> {
-  const client = new NedisClient(config);
-  await client.connect();
-  return client;
+export function createClient(config?: NedisConfig): NedisClient {
+  return new NedisClient(config);
 }
 
 export default {

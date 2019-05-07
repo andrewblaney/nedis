@@ -2,8 +2,7 @@
   "name": "@bbc/nedis",
   "version": "1.0.0",
   "description": "Node Redis DB",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "dist/src/index.js",
   "scripts": {
     "build": "npm run clean && tsc",
     "watch": "tsc --watch",
